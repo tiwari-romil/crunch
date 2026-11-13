@@ -1,4 +1,4 @@
-/* Crunch — Hridhaan's dragon quest.
+/* Crunch — Bunny's dragon quest.
    Each land teaches one idea in a comic, then a puzzle.
    A gate's run() is the whole gate lesson: buttons in, lamp on or off. */
 (function (root, factory) {
@@ -60,7 +60,7 @@
       title: "The Chase",
       panels: [
         { art: "chase", who: "narrator", burst: "NIGHT", line: "In Paper Village, the lamp goes dark. A dragon named Blaze carries it away." },
-        { art: "chase", who: "hridhaan", burst: "GO!", line: "I am Hridhaan. I will follow Blaze, and I will learn every lock." },
+        { art: "chase", who: "hridhaan", burst: "GO!", line: "I am Bunny. I will follow Blaze, and I will learn every lock." },
         { art: "signal", who: "narrator", burst: "ON", line: "The first lock is a signal. On or off. That is how a computer listens." }
       ]
     },
@@ -69,7 +69,7 @@
       kind: "wake",
       chapter: "gates",
       title: "Signal Stone",
-      speech: "Tap the signal stone. A tap is how Hridhaan talks to the computer.",
+      speech: "Tap the signal stone. A tap is how Bunny talks to the computer.",
       yay: "The stone heard you. The bridge is waking up.",
       inputs: [],
       choices: [],
@@ -259,7 +259,7 @@
       title: "Three Steps",
       speech: "The program is Right, Right, Jump. Put those steps in line, then press Go.",
       hint: "First step happens first. Sit is not in this program.",
-      yay: "Hridhaan followed the program, one step at a time.",
+      yay: "Bunny followed the program, one step at a time.",
       recipe: ["right", "right", "jump"],
       tray: ["right", "jump", "sit"],
       cast: "Go"
@@ -308,7 +308,7 @@
     { id: "loops", title: "Echo Cave", kicker: "Loops", blurb: "Do it again, as many times as you say." },
     { id: "spells", title: "Spell Tower", kicker: "Functions", blurb: "A named card runs every step inside it." },
     { id: "programs", title: "Step Road", kicker: "Programs", blurb: "Steps in a line. The first step happens first." },
-    { id: "dragon", title: "Dragon Peak", kicker: "The fight", blurb: "Three locks. Then Hridhaan meets the dragon." }
+    { id: "dragon", title: "Dragon Peak", kicker: "The fight", blurb: "Three locks. Then Bunny meets the dragon." }
   ];
 
   return { GATES: GATES, LEVELS: LEVELS, CHAPTERS: CHAPTERS, SANDBOX: SANDBOX };

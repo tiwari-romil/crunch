@@ -1,4 +1,4 @@
-/* Crunch — Hridhaan's dragon quest.
+/* Crunch — Bunny's dragon quest.
    index.html is the page, style.css is the comic ink, this file is the rules.
    A comic teaches the idea. Then a puzzle opens the next piece of the path. */
 
@@ -320,7 +320,7 @@
       if (!state.placed) return level.speech;
       return GATES[state.placed].blurb;
     }
-    if (state.phase === "drawing") return "Hridhaan is drawing the wires.";
+    if (state.phase === "drawing") return "Bunny is drawing the wires.";
     if (state.phase === "demo") return "Does the lamp match the picture?";
     if (state.phase === "fail") return level.hint;
     if (state.phase === "success") return level.yay;
@@ -495,8 +495,8 @@
   }
 
   function lineNow() {
-    if (state.screen === "home") return { text: "Blaze took the village lamp. Hridhaan is going after him.", who: "narrator" };
-    if (state.screen === "done") return { text: "Blaze bows. The lamp is free, and Hridhaan knows the road.", who: "narrator" };
+    if (state.screen === "home") return { text: "Blaze took the village lamp. Bunny is going after him.", who: "narrator" };
+    if (state.screen === "done") return { text: "Blaze bows. The lamp is free, and Bunny knows the road.", who: "narrator" };
     if (state.screen !== "play") return { text: "", who: "narrator" };
     var level = currentLevel();
     if (level.kind === "tale") {
@@ -564,7 +564,7 @@
     return '' +
       '<section class="grownups" id="grownups"' + (state.grownups ? "" : " hidden") + ">" +
         "<h3>For grownups</h3>" +
-        "<p>Hridhaan is chasing Blaze, the dragon who took the village lamp. Each land opens with a manga page, and the computer reads it aloud. Hear says the line again. Mute stops the voice and the music. He still does the tapping.</p>" +
+        "<p>Bunny is chasing Blaze, the dragon who took the village lamp. Each land opens with a manga page, and the computer reads it aloud. Hear says the line again. Mute stops the voice and the music. Bunny still does the tapping.</p>" +
         "<p>Signal Bridge is logic gates. A button is a bit: on is 1, off is 0. Copy matches it. Opposite flips it. Both (AND) needs every button. Either (OR) needs one. Bag Canyon is variables: a name that keeps a value you can change. Echo Cave is a loop: repeat a chosen number of times. Spell Tower is a function: a named card of steps. Step Road is a program: steps in order. Dragon Peak uses all three locks.</p>" +
         gateLine +
         '<div class="check-row"><label><input type="checkbox" id="bits"' + (store.data.bits ? " checked" : "") + "> Show 1 and 0 on the wires</label>" +
@@ -593,10 +593,10 @@
     var note = earned ? '<p class="progress-note">' + earned + " of " + LEVELS.length + " pages</p>" : "";
     return '' +
       '<section class="home">' +
-        '<p class="kicker">Hridhaan\'s dragon quest</p>' +
+        '<p class="kicker">Bunny\'s dragon quest</p>' +
         '<h1 class="title"><span class="logo-frame"><img class="game-logo" src="art/logo.svg" alt="Crunch" onerror="var f=this.parentNode;this.remove();if(f)f.classList.add(\'logo-off\')"></span><span class="logo-letters">' + crayonLetters("Crunch") + "</span></h1>" +
         '<div class="splash">' + charaStill("art/hridhaan.jpg", heroMarkup()) + charaStill("art/blaze.jpg", dragonMarkup("mad")) + "</div>" +
-        '<div class="lede"><p class="bubble" id="speech" aria-live="polite">Blaze took the village lamp. Hridhaan is going after him.</p>' +
+        '<div class="lede"><p class="bubble" id="speech" aria-live="polite">Blaze took the village lamp. Bunny is going after him.</p>' +
         '<button type="button" class="hear" data-action="hear" aria-label="Hear the line">Hear</button></div>' +
         note +
         '<button type="button" class="cta" data-action="open">Open the path</button>' +
@@ -657,7 +657,7 @@
       '<section class="done">' +
         '<div class="splash">' + charaStill(portraitFile("cheer", "hridhaan"), heroMarkup("cheer")) + charaStill(portraitFile("friend", "blaze"), dragonMarkup("friend")) + "</div>" +
         "<h2>The dragon bows</h2>" +
-        '<p class="bubble" id="speech">Blaze bows. The lamp is free, and Hridhaan knows the road.</p>' +
+        '<p class="bubble" id="speech">Blaze bows. The lamp is free, and Bunny knows the road.</p>' +
         '<button type="button" class="hear" data-action="hear" aria-label="Hear the line">Hear</button>' +
         '<ul class="learned">' + words + "</ul>" +
         '<div class="actions">' +
@@ -754,7 +754,7 @@
     var panel = level.panels[state.panel];
     var last = state.panel >= level.panels.length - 1;
     var who = panel.who || "narrator";
-    var tag = who === "blaze" ? "Blaze" : (who === "hridhaan" ? "Hridhaan" : "Story");
+    var tag = who === "blaze" ? "Blaze" : (who === "hridhaan" ? "Bunny" : "Story");
     var dots = level.panels.map(function (_, i) {
       return '<i class="' + (i === state.panel ? "on" : "") + '"></i>';
     }).join("");
@@ -1767,7 +1767,7 @@
     if (action === "tale-next") { finishTale(); return; }
     if (action === "land") { openLand(el.getAttribute("data-chapter")); return; }
     if (action === "locked") {
-      state.note = "Finish the land before this one. Hridhaan cannot skip ahead.";
+      state.note = "Finish the land before this one. Bunny cannot skip ahead.";
       state.screen = "map";
       render();
       return;
