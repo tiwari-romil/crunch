@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 240" role="img" aria-label="Crunch">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="52%" r="48%">
+      <stop offset="0%" stop-color="#ffe14a"/>
+      <stop offset="62%" stop-color="#ffe14a" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffe14a" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="bite">
+      <rect width="900" height="240" fill="#fff"/>
+      <circle cx="228" cy="86" r="16" fill="#000"/>
+      <circle cx="246" cy="70" r="10" fill="#000"/>
+      <circle cx="214" cy="104" r="8" fill="#000"/>
+    </mask>
+  </defs>
+  <ellipse cx="450" cy="128" rx="310" ry="82" fill="url(#glow)"/>
+  <g mask="url(#bite)" font-family="Impact, 'Arial Black', sans-serif" font-size="150" text-anchor="middle">
+    <text x="450" y="176" fill="#fffaf0" stroke="#1a140e" stroke-width="16" stroke-linejoin="round" paint-order="stroke fill">CRUNCH</text>
+  </g>
+  <g fill="#fffaf0" stroke="#1a140e" stroke-width="3">
+    <circle cx="196" cy="62" r="7"/>
+    <circle cx="180" cy="78" r="5"/>
+    <circle cx="204" cy="48" r="4"/>
+  </g>
+  <g fill="none" stroke="#1a140e" stroke-width="4" stroke-linecap="round">
+    <path d="M250 46 l16-14 M268 58 l20-8"/>
+    <path d="M640 50 l18-14 M658 66 l22-6"/>
+    <path d="M270 198 l14 12 M650 196 l16 12"/>
+  </g>
+</svg>
