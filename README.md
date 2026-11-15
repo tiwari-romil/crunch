@@ -1,8 +1,8 @@
 # Crunch
 
-Bunny's dragon quest. Blaze took the village lamp, and Bunny follows him through a short comic that teaches the first ideas in computer science.
+Drag-and-drop puzzles for the first ideas in computer logic and programming.
 
-Each land opens with a page, then a puzzle. The computer can read the line aloud. Hear says it again. Mute stops the voice and the music.
+The instruction sits on the page. Mute stops the sounds.
 
 ## Play
 
@@ -12,16 +12,16 @@ You can also open `index.html` in a browser. That plays on this computer only.
 
 ## The path
 
-Lands open in order.
+Every stop on the path is open. Play them in any order.
 
-| Land | Idea | Kid word |
+| Page | Idea | What you do |
 | --- | --- | --- |
-| Signal Bridge | Logic gates | Copy, Opposite, Both, Either |
-| Bag Canyon | Variables | A named bag that keeps a value |
-| Echo Cave | Loops | Do it again a chosen number of times |
-| Spell Tower | Functions | A named card of steps |
-| Step Road | Programs | Steps in order |
-| Dragon Peak | All three | Courage, a roar, and a shield |
+| Logic | Gates | Drag Copy, Opposite, Both, or Either so the lamp matches every picture |
+| Variables | A named bag | Put a value in Hearts, then change it |
+| Loops | Repeat | Set how many times, then press Go |
+| Functions | A named card | Put Block, then Spark, and cast Shield |
+| Programs | Steps in order | Line up Right, Right, Jump, then press Go |
+| Practice | All three | Hearts holds 2, loop 3 times, cast Shield |
 
 Free draw is a sandbox for the four gates. It does not mark a page done.
 
@@ -35,4 +35,4 @@ Keys while a gate puzzle is open: `1` flips the switch, `2` presses the moon, le
 
 ## Files
 
-`index.html` is the page, `style.css` is the ink, `game.js` is the rules, and `levels.js` is the story. Pictures live in `art/`. `Start Crunch.bat` starts `serve-lan.ps1`, which serves this folder on this PC and on the local network.
+`index.html` is the page, `style.css` is the ink, `game.js` is the rules, and `levels.js` is the puzzles. `Start Crunch.bat` starts `serve-lan.ps1`, which serves this folder on this PC and on the local network.

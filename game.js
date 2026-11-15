@@ -1,6 +1,5 @@
-/* Crunch — Bunny's dragon quest.
-   index.html is the page, style.css is the comic ink, this file is the rules.
-   A comic teaches the idea. Then a puzzle opens the next piece of the path. */
+/* Crunch — drag-and-drop puzzles.
+   index.html is the page, style.css is the ink, this file is the rules. */
 
 (function () {
   var data = window.CRAYON;
@@ -13,7 +12,7 @@
 
   var store = {
     key: "sparky-sketch-pad-v1",
-    data: { stars: {}, muted: false, bits: false, coach: true, place: null },
+    data: { stars: {}, muted: false, bits: false, coach: true, place: null, seenDay: "", reviewDue: false, reviewAt: 0 },
     load: function () {
       try {
         var raw = JSON.parse(localStorage.getItem(this.key) || "{}");
@@ -22,6 +21,9 @@
         if (typeof raw.bits === "boolean") this.data.bits = raw.bits;
         if (typeof raw.coach === "boolean") this.data.coach = raw.coach;
         if (raw.place && typeof raw.place.screen === "string") this.data.place = raw.place;
+        if (typeof raw.seenDay === "string") this.data.seenDay = raw.seenDay;
+        if (typeof raw.reviewDue === "boolean") this.data.reviewDue = raw.reviewDue;
+        if (typeof raw.reviewAt === "number" && raw.reviewAt >= 0) this.data.reviewAt = raw.reviewAt;
       } catch (err) { /* private mode or blocked storage */ }
     },
     save: function () {
@@ -48,7 +50,6 @@
       osc.type = type || "sine";
       osc.frequency.setValueAtTime(freq, t);
       if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t + dur);
-      if (window.speechSynthesis && window.speechSynthesis.speaking) gain = gain * 0.3;
       amp.gain.setValueAtTime(0.0001, t);
       amp.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), t + 0.02);
       amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -92,6 +93,7 @@
     stepN: 0,
     noise: null,
     startMusic: function () {
+      return;
       if (this.musicOn || store.data.muted) return;
       this.unlock();
       if (!this.ctx) return;
@@ -144,47 +146,9 @@
   };
 
   var voice = {
-    chosen: null,
-    ready: function () {
-      if (!window.speechSynthesis) return null;
-      var list = window.speechSynthesis.getVoices();
-      if (!list.length) return null;
-      var en = list.filter(function (item) { return /^en/i.test(item.lang); });
-      var pool = en.length ? en : list;
-      this.chosen = pool.filter(function (item) { return /zira|aria|jenny|sara|libby|female/i.test(item.name); })[0] || pool[0];
-      return this.chosen;
-    },
-    say: function (text, who) {
-      if (store.data.muted || !window.speechSynthesis || !text) return;
-      var synth = window.speechSynthesis;
-      var make = function () {
-        var utter = new SpeechSynthesisUtterance(text);
-        utter.lang = "en-US";
-        utter.rate = who === "blaze" ? 0.86 : 0.92;
-        utter.pitch = who === "blaze" ? 0.62 : (who === "hridhaan" ? 1.32 : 1.02);
-        var picked = voice.ready();
-        if (picked) utter.voice = picked;
-        return utter;
-      };
-      var busy = synth.speaking || synth.pending;
-      if (busy) synth.cancel();
-      synth.resume();
-      synth.speak(make());
-      if (!busy) return;
-      setTimeout(function () {
-        if (store.data.muted || synth.speaking || synth.pending) return;
-        synth.resume();
-        synth.speak(make());
-      }, 120);
-    },
-    stop: function () {
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
-    }
+    say: function () {},
+    stop: function () {}
   };
-  if (window.speechSynthesis) {
-    window.speechSynthesis.onvoiceschanged = function () { voice.ready(); };
-    voice.ready();
-  }
 
   var state = {
     screen: "home",
@@ -206,7 +170,10 @@
     bossLoop: 1,
     bossLocks: {},
     running: false,
-    replaying: false
+    replaying: false,
+    reviewing: false,
+    promptAt: 0,
+    promptLine: ""
   };
 
   var demoToken = 0;
@@ -241,14 +208,8 @@
     return LEVELS.filter(function (level) { return level.chapter === id; });
   }
 
-  function chapterCleared(id) {
-    var levels = chapterLevels(id);
-    return levels.length > 0 && levels.every(function (level) { return store.data.stars[level.id]; });
-  }
-
-  function chapterOpen(index) {
-    if (index <= 0) return true;
-    return chapterCleared(CHAPTERS[index - 1].id);
+  function chapterOpen() {
+    return true;
   }
 
   function earnedCount() {
@@ -262,6 +223,47 @@
   function continueIndex() {
     var index = LEVELS.findIndex(function (level) { return !store.data.stars[level.id]; });
     return index === -1 ? 0 : index;
+  }
+
+  function dayKey() {
+    var now = new Date();
+    return now.getFullYear() + "-" + (now.getMonth() + 1) + "-" + now.getDate();
+  }
+
+  function reviewPool() {
+    return LEVELS.filter(function (level) {
+      if (!store.data.stars[level.id]) return false;
+      if (level.kind === "tale" || level.kind === "wake") return false;
+      return true;
+    });
+  }
+
+  function reviewLevel() {
+    var pool = reviewPool();
+    if (!pool.length) return null;
+    return pool[(store.data.reviewAt || 0) % pool.length];
+  }
+
+  function stampDay() {
+    if (previewing) return;
+    var today = dayKey();
+    var prior = store.data.seenDay;
+    if (prior && prior !== today && reviewPool().length) store.data.reviewDue = true;
+    store.data.seenDay = today;
+    store.save();
+  }
+
+  function offerReview() {
+    var level = reviewLevel();
+    if (!level) return false;
+    var index = LEVELS.findIndex(function (item) { return item.id === level.id; });
+    if (index < 0) return false;
+    beginLevel(index, true);
+    return true;
+  }
+
+  function shouldOfferReview() {
+    return false;
   }
 
   function gateMatches(level, gateId) {
@@ -315,15 +317,18 @@
 
   function speechText() {
     var level = currentLevel();
+    if (state.reviewing && state.phase === "success") return "The old lock opened again.";
     if (level.kind === "tale") return level.panels[Math.min(state.panel, level.panels.length - 1)].line;
     if (level.sandbox) {
       if (!state.placed) return level.speech;
       return GATES[state.placed].blurb;
     }
-    if (state.phase === "drawing") return "Bunny is drawing the wires.";
+    if (state.phase === "drawing") return "Checking the pictures.";
     if (state.phase === "demo") return "Does the lamp match the picture?";
     if (state.phase === "fail") return level.hint;
     if (state.phase === "success") return level.yay;
+    if (level.kind === "pick" && state.promptAt > 0 && state.promptLine) return state.promptLine;
+    if (state.reviewing && state.phase === "pick") return "Old lock. No page this time. " + level.speech;
     return level.speech;
   }
 
@@ -485,8 +490,12 @@
     if (panel.art === "spell") prop = icon("block") + icon("spark");
     if (panel.art === "steps") prop = icon("right") + icon("right") + icon("jump");
     if (panel.art === "signal") prop = '<div class="lamp on mini-hero-lamp">' + lampGraphic() + "</div>";
-    if (panel.art === "chase") {
-      return '<div class="duo">' + charaStill(portraitFile("", "hridhaan"), heroMarkup()) + charaStill(portraitFile("", "blaze"), dragonMarkup("mad")) + "</div>";
+    if (panel.art === "chase" || panel.art === "strike") {
+      var bunnyMood = panel.art === "strike" ? "cheer" : "";
+      return '<div class="duo">' + charaStill(portraitFile(bunnyMood, "hridhaan"), heroMarkup(bunnyMood)) + charaStill(portraitFile("", "blaze"), dragonMarkup("mad")) + "</div>";
+    }
+    if (panel.art === "bow") {
+      return '<div class="duo">' + charaStill(portraitFile("cheer", "hridhaan"), heroMarkup("cheer")) + charaStill(portraitFile("friend", "blaze"), dragonMarkup("friend")) + "</div>";
     }
     if (who === "blaze" || panel.art === "dragon") {
       return '<div class="duo">' + charaStill(portraitFile(mood, "blaze"), dragonMarkup(mood === "friend" ? "friend" : "mad")) + prop + "</div>";
@@ -494,9 +503,13 @@
     return '<div class="duo">' + charaStill(portraitFile(mood, "hridhaan"), heroMarkup(mood)) + prop + "</div>";
   }
 
+  function formById() {
+    return null;
+  }
+
   function lineNow() {
-    if (state.screen === "home") return { text: "Blaze took the village lamp. Bunny is going after him.", who: "narrator" };
-    if (state.screen === "done") return { text: "Blaze bows. The lamp is free, and Bunny knows the road.", who: "narrator" };
+    if (state.screen === "home") return { text: "Drag gates. Then bags, loops, and steps.", who: "narrator" };
+    if (state.screen === "done") return { text: "Logic, variables, loops, functions, and programs.", who: "narrator" };
     if (state.screen !== "play") return { text: "", who: "narrator" };
     var level = currentLevel();
     if (level.kind === "tale") {
@@ -508,24 +521,10 @@
     return { text: speechText(), who: who };
   }
 
-  function narrateCurrent() {
-    if (store.data.muted) {
-      voice.stop();
-      return;
-    }
-    var line = lineNow();
-    if (!line.text) {
-      voice.stop();
-      lastSaid = "";
-      return;
-    }
-    if (line.text === lastSaid) return;
-    lastSaid = line.text;
-    voice.say(line.text, line.who);
-  }
+  function narrateCurrent() {}
 
   function topBar(title) {
-    var countLabel = state.sandbox ? "Play pad" : (state.levelIndex + 1) + " / " + LEVELS.length;
+    var countLabel = state.sandbox ? "Play pad" : state.reviewing ? "Old lock" : (state.levelIndex + 1) + " / " + LEVELS.length;
     return '' +
       '<header class="top">' +
         '<button type="button" class="ghost" data-action="map">Path</button>' +
@@ -536,10 +535,8 @@
       "</header>";
   }
 
-  function talkBar(text, mood) {
-    return '<div class="talk">' + charaStill(portraitFile(mood || "", "hridhaan"), heroMarkup(mood)) +
-      '<p class="bubble" id="speech" aria-live="polite">' + text + "</p>" +
-      '<button type="button" class="hear" data-action="hear" aria-label="Hear the line">Hear</button></div>';
+  function talkBar(text) {
+    return '<p class="prompt" id="speech">' + text + "</p>";
   }
 
   function miniBtn(input, on) {
@@ -564,14 +561,13 @@
     return '' +
       '<section class="grownups" id="grownups"' + (state.grownups ? "" : " hidden") + ">" +
         "<h3>For grownups</h3>" +
-        "<p>Bunny is chasing Blaze, the dragon who took the village lamp. Each land opens with a manga page, and the computer reads it aloud. Hear says the line again. Mute stops the voice and the music. Bunny still does the tapping.</p>" +
-        "<p>Signal Bridge is logic gates. A button is a bit: on is 1, off is 0. Copy matches it. Opposite flips it. Both (AND) needs every button. Either (OR) needs one. Bag Canyon is variables: a name that keeps a value you can change. Echo Cave is a loop: repeat a chosen number of times. Spell Tower is a function: a named card of steps. Step Road is a program: steps in order. Dragon Peak uses all three locks.</p>" +
+        "<p>Each page is a puzzle. Logic is drag-and-drop gates: Copy, Opposite, Both, and Either. A button is a bit. On is 1, off is 0. Then a named bag (a variable), a counted repeat (a loop), a named card of steps (a function), and steps in order (a program). The last page uses the bag, the loop, and the function.</p>" +
         gateLine +
         '<div class="check-row"><label><input type="checkbox" id="bits"' + (store.data.bits ? " checked" : "") + "> Show 1 and 0 on the wires</label>" +
         '<button type="button" class="tiny danger" data-action="reset">Reset progress</button>' +
         '<button type="button" class="tiny" data-action="close-grownups">Close</button></div>' +
         "<p>Keys: 1 flips the switch, 2 presses the moon. Left and right arrows drop a gate. Escape goes back to the path.</p>" +
-        "<p>The tune is made in the browser. Mute keeps it quiet. This folder is the page, the ink, and the rules.</p>" +
+        "<p>Mute keeps the sounds quiet.</p>" +
       "</section>";
   }
 
@@ -593,13 +589,11 @@
     var note = earned ? '<p class="progress-note">' + earned + " of " + LEVELS.length + " pages</p>" : "";
     return '' +
       '<section class="home">' +
-        '<p class="kicker">Bunny\'s dragon quest</p>' +
+        '<p class="kicker">Logic and programs</p>' +
         '<h1 class="title"><span class="logo-frame"><img class="game-logo" src="art/logo.svg" alt="Crunch" onerror="var f=this.parentNode;this.remove();if(f)f.classList.add(\'logo-off\')"></span><span class="logo-letters">' + crayonLetters("Crunch") + "</span></h1>" +
-        '<div class="splash">' + charaStill("art/hridhaan.jpg", heroMarkup()) + charaStill("art/blaze.jpg", dragonMarkup("mad")) + "</div>" +
-        '<div class="lede"><p class="bubble" id="speech" aria-live="polite">Blaze took the village lamp. Bunny is going after him.</p>' +
-        '<button type="button" class="hear" data-action="hear" aria-label="Hear the line">Hear</button></div>' +
+        '<p class="prompt">Drag gates. Then bags, loops, and steps.</p>' +
         note +
-        '<button type="button" class="cta" data-action="open">Open the path</button>' +
+        '<button type="button" class="cta" data-action="open">Open the puzzles</button>' +
         '<div class="home-tools">' +
           '<button type="button" class="tiny" data-action="grownups">Grownups</button>' +
           '<button type="button" class="tiny danger" data-action="reset">Reset progress</button>' +
@@ -611,7 +605,7 @@
   function mapHTML() {
     var earned = earnedCount();
     var done = allEarned();
-    var label = done ? "Play again" : earned ? "Keep going" : "Start the chase";
+    var label = done ? "Play again" : earned ? "Keep going" : "Start";
     var lands = CHAPTERS.map(function (chapter, i) {
       var open = chapterOpen(i);
       var levels = chapterLevels(chapter.id);
@@ -655,13 +649,11 @@
     }).join("");
     return '' +
       '<section class="done">' +
-        '<div class="splash">' + charaStill(portraitFile("cheer", "hridhaan"), heroMarkup("cheer")) + charaStill(portraitFile("friend", "blaze"), dragonMarkup("friend")) + "</div>" +
-        "<h2>The dragon bows</h2>" +
-        '<p class="bubble" id="speech">Blaze bows. The lamp is free, and Bunny knows the road.</p>' +
-        '<button type="button" class="hear" data-action="hear" aria-label="Hear the line">Hear</button>' +
+        "<h2>Puzzles done</h2>" +
+        '<p class="prompt">Logic, variables, loops, functions, and programs.</p>' +
         '<ul class="learned">' + words + "</ul>" +
         '<div class="actions">' +
-          '<button type="button" class="cta" data-action="level" data-level="0">Quest again</button>' +
+          '<button type="button" class="cta" data-action="level" data-level="0">Play again</button>' +
           '<button type="button" class="ghost" data-action="pad">Free draw</button>' +
           '<button type="button" class="ghost" data-action="map">The path</button>' +
         "</div>" +
@@ -672,7 +664,7 @@
     var level = currentLevel();
     var inputs = activeInputs();
     var gate = state.placed ? GATES[state.placed] : null;
-    var countLabel = state.sandbox ? "Play pad" : (state.levelIndex + 1) + " / " + LEVELS.length;
+    var countLabel = state.sandbox ? "Play pad" : state.reviewing ? "Old lock" : (state.levelIndex + 1) + " / " + LEVELS.length;
     var buttons = inputs.map(function (input, i) {
       var on = !!state.inputs[i];
       var kind = input.id === "switch" ? " switch" : "";
@@ -755,6 +747,9 @@
     var last = state.panel >= level.panels.length - 1;
     var who = panel.who || "narrator";
     var tag = who === "blaze" ? "Blaze" : (who === "hridhaan" ? "Bunny" : "Story");
+    var known = panel.form ? formById(panel.form) : null;
+    var ribbon = known ? '<p class="form-ribbon"><span>' + known.order + "</span> " + known.name + "</p>" : "";
+    var strike = panel.art === "strike" ? " strike" : "";
     var dots = level.panels.map(function (_, i) {
       return '<i class="' + (i === state.panel ? "on" : "") + '"></i>';
     }).join("");
@@ -762,7 +757,7 @@
       '<section class="play tale">' +
         topBar(level.title) +
         '<p class="burst">' + panel.burst + "</p>" +
-        '<div class="panel manga"><span class="name-tag">' + tag + '</span><div class="tale-art">' + taleArt(panel) + '</div>' +
+        '<div class="panel manga' + strike + '"><span class="name-tag">' + tag + "</span>" + ribbon + '<div class="tale-art">' + taleArt(panel) + '</div>' +
         '<p class="balloon">' + panel.line + '</p>' +
         '<button type="button" class="hear" data-action="hear" aria-label="Hear the line">Hear</button></div>' +
         '<div class="panel-dots">' + dots + "</div>" +
@@ -841,11 +836,10 @@
     } else if (level.kind === "boss") {
       var friend = level.locks.every(function (lock) { return state.bossLocks[lock.id]; });
       body = '' +
-        '<div class="boss-layout">' +
-          charaStill(portraitFile(friend ? "friend" : "", "blaze"), dragonMarkup(friend ? "friend" : "mad", false), "dragon") +
+        '<div class="boss-layout plain">' +
           '<div class="locks">' +
             '<div class="lock' + (state.bossLocks.bag ? " open" : "") + '" id="lock-bag">' +
-              "<strong>Courage holds 2</strong>" +
+              "<strong>" + level.locks[0].name + "</strong>" +
               '<div class="lock-work stepper">' +
                 '<button type="button" data-action="boss-bag" data-delta="-1" aria-label="Fewer hearts">−</button>' +
                 '<strong id="boss-bag-n">' + state.bossBag + "</strong>" +
@@ -853,16 +847,16 @@
               "</div>" +
             "</div>" +
             '<div class="lock' + (state.bossLocks.loop ? " open" : "") + '" id="lock-loop">' +
-              "<strong>Roar 3 times</strong>" +
+              "<strong>" + level.locks[1].name + "</strong>" +
               '<div class="lock-work stepper">' +
                 '<button type="button" data-action="boss-loop" data-delta="-1" aria-label="Fewer roars">−</button>' +
                 '<strong id="boss-loop-n">' + state.bossLoop + "</strong>" +
                 '<button type="button" data-action="boss-loop" data-delta="1" aria-label="More roars">+</button>' +
-                '<button type="button" data-action="boss-roar">Roar</button>' +
+                '<button type="button" data-action="boss-roar">Go</button>' +
               "</div>" +
             "</div>" +
             '<div class="lock' + (state.bossLocks.spell ? " open" : "") + '" id="lock-spell">' +
-              "<strong>Cast Shield</strong>" +
+              "<strong>" + level.locks[2].name + "</strong>" +
               '<div class="lock-work stepper">' +
                 '<button type="button" data-action="boss-spell" data-token="shield">' + icon("block") + " Shield</button>" +
                 '<button type="button" data-action="boss-spell" data-token="nap">' + icon("nap") + " Nap</button>" +
@@ -880,6 +874,39 @@
         '<div class="play-actions">' +
           '<button type="button" class="ghost" id="retry" data-action="retry" hidden>Try again</button>' +
           '<button type="button" class="cta" id="next" data-action="next" hidden>Onward</button>' +
+        "</div>" +
+        grownupsPanel() +
+      "</section>";
+  }
+
+  function pickHTML() {
+    var level = currentLevel();
+    var prompt = level.prompts[Math.min(state.promptAt, level.prompts.length - 1)];
+    var mood = state.phase === "success" ? "cheer" : (state.phase === "fail" ? "think" : "");
+    var cards = level.choices.map(function (id) {
+      var item = GATES[id];
+      return '<button type="button" class="gate-card pick-card" style="--wax:' + item.color + '" data-gate="' + id + '" data-action="pick-gate">' +
+        '<span class="gate-draw">' + gateArt(id) + "</span>" +
+        '<span class="gate-kid">' + item.kid + "</span>" +
+        '<span class="gate-name">' + item.name + "</span></button>";
+    }).join("");
+    var tap = level.choices.map(function (id) { return GATES[id].kid; }).join(" or ");
+    return '' +
+      '<section class="play quest">' +
+        topBar(level.title) +
+        talkBar(speechText(), mood) +
+        '<div class="quest-stage">' +
+          '<p class="rule-line">Picture ' + (state.promptAt + 1) + " / " + level.prompts.length + "</p>" +
+          '<div class="comic pick-pic' + (state.shake ? " shake" : "") + '" id="pick-pic">' +
+            '<span class="mini-ins">' + prompt.in.map(function (on, k) { return miniBtn(level.inputs[k], on); }).join("") + "</span>" +
+            arrow() +
+            '<span class="mini-lamp' + (prompt.out ? " on" : "") + '"></span>' +
+          "</div>" +
+        "</div>" +
+        '<p class="tray-label">Tap ' + tap + "</p>" +
+        '<div class="tray-scroll pick-tray">' + cards + "</div>" +
+        '<div class="play-actions">' +
+          '<button type="button" class="cta" id="next" data-action="next"' + (state.phase === "success" ? "" : " hidden") + ">Onward</button>" +
         "</div>" +
         grownupsPanel() +
       "</section>";
@@ -925,6 +952,12 @@
         lastKey = "";
         screenEl.innerHTML = taleHTML();
         narrateCurrent();
+        return;
+      }
+      if (kind === "pick") {
+        lastKey = "";
+        screenEl.innerHTML = pickHTML();
+        paint();
         return;
       }
       if (kind === "bags" || kind === "loop" || kind === "spell" || kind === "order" || kind === "boss") {
@@ -1255,7 +1288,7 @@
   function remember() {
     if (previewing) return;
     if (state.sandbox) store.data.place = { screen: "pad" };
-    else if (state.screen === "play") store.data.place = { screen: "play", levelIndex: state.levelIndex };
+    else if (state.screen === "play") store.data.place = { screen: "play", levelIndex: state.levelIndex, reviewing: !!state.reviewing };
     else store.data.place = { screen: state.screen };
     store.save();
   }
@@ -1266,7 +1299,7 @@
     if (place.screen === "play") {
       var index = Number(place.levelIndex);
       if (!LEVELS[index]) return false;
-      beginLevel(index);
+      beginLevel(index, !!place.reviewing);
       return true;
     }
     if (place.screen === "pad") {
@@ -1287,6 +1320,8 @@
     if (!window.confirm(message)) return;
     cancelDemo();
     store.data.stars = {};
+    store.data.reviewDue = false;
+    store.data.reviewAt = 0;
     store.data.place = { screen: "home" };
     store.save();
     state.grownups = false;
@@ -1305,7 +1340,7 @@
     state.phase = "success";
     state.shake = false;
     paint();
-    if (first) {
+    if (first || state.reviewing) {
       audio.win();
       confetti();
     }
@@ -1340,13 +1375,16 @@
     markSuccess();
   }
 
-  function beginLevel(index) {
+  function beginLevel(index, reviewing) {
     cancelDemo();
+    state.reviewing = !!reviewing;
     state.sandbox = false;
     state.screen = "play";
     state.levelIndex = index;
     state.grownups = false;
     state.note = "";
+    state.promptAt = 0;
+    state.promptLine = "";
     var level = LEVELS[index];
     state.replaying = !!(level && store.data.stars[level.id]);
     state.inputs = (level.inputs || []).map(function () { return false; });
@@ -1366,7 +1404,24 @@
     render();
   }
 
+  function finishReview() {
+    store.data.reviewDue = false;
+    store.data.reviewAt = (store.data.reviewAt || 0) + 1;
+    state.reviewing = false;
+    store.save();
+    if (allEarned()) showScreen("map");
+    else beginLevel(continueIndex());
+  }
+
   function goOnward() {
+    if (state.reviewing) {
+      finishReview();
+      return;
+    }
+    if (shouldOfferReview()) {
+      offerReview();
+      return;
+    }
     var index = state.levelIndex + 1;
     if (!state.replaying) {
       while (index < LEVELS.length && store.data.stars[LEVELS[index].id]) index += 1;
@@ -1377,6 +1432,7 @@
 
   function beginPad() {
     cancelDemo();
+    state.reviewing = false;
     state.sandbox = true;
     state.screen = "play";
     state.levelIndex = -1;
@@ -1388,8 +1444,38 @@
     render();
   }
 
+  function choosePick(id) {
+    var level = currentLevel();
+    if (!level || level.kind !== "pick" || state.phase === "success") return;
+    var prompt = level.prompts[state.promptAt];
+    if (!prompt) return;
+    audio.unlock();
+    if (id !== prompt.answer) {
+      state.phase = "fail";
+      state.shake = true;
+      audio.nope();
+      render();
+      state.shake = false;
+      return;
+    }
+    var seen = 0;
+    for (var i = 0; i <= state.promptAt; i++) {
+      if (level.prompts[i].answer === id) seen += 1;
+    }
+    if (state.promptAt >= level.prompts.length - 1) {
+      markSuccess();
+      return;
+    }
+    state.promptAt += 1;
+    state.phase = "pick";
+    state.promptLine = seen >= 2 ? "Yes. You pulled that one back again." : "Yes. Next picture.";
+    audio.ding();
+    render();
+  }
+
   function placeGate(id) {
     var level = currentLevel();
+    if (level.kind === "pick") return;
     if (!GATES[id]) return;
     if (level.choices.indexOf(id) === -1) return;
     audio.unlock();
@@ -1452,6 +1538,7 @@
 
   function showScreen(name) {
     cancelDemo();
+    state.reviewing = false;
     state.screen = name;
     state.grownups = false;
     state.sandbox = false;
@@ -1501,7 +1588,7 @@
     var card = event.target.closest("[data-gate]");
     if (!card || state.screen !== "play") return;
     var level = currentLevel();
-    if (!level || level.kind === "wake") return;
+    if (!level || level.kind === "wake" || level.kind === "pick") return;
     gateDrag = {
       id: card.getAttribute("data-gate"),
       pointerId: event.pointerId,
@@ -1708,6 +1795,10 @@
   function onClick(event) {
     var gate = event.target.closest("[data-gate]");
     if (gate) {
+      if (currentLevel() && currentLevel().kind === "pick") {
+        choosePick(gate.getAttribute("data-gate"));
+        return;
+      }
       if (ignoreGateClick) return;
       placeGate(gate.getAttribute("data-gate"));
       return;
@@ -1723,6 +1814,10 @@
       return;
     }
     var action = el.getAttribute("data-action");
+    if (action === "pick-gate") {
+      choosePick(el.getAttribute("data-gate"));
+      return;
+    }
     if (action === "open") {
       audio.unlock();
       audio.hello();
@@ -1734,7 +1829,11 @@
     if (action === "home") { showScreen("home"); return; }
     if (action === "done") { showScreen("done"); return; }
     if (action === "pad") { beginPad(); return; }
-    if (action === "continue") { beginLevel(continueIndex()); return; }
+    if (action === "continue") {
+      state.note = "";
+      beginLevel(continueIndex());
+      return;
+    }
     if (action === "level") { beginLevel(Number(el.getAttribute("data-level") || 0)); return; }
     if (action === "wake-click") {
       var wake = currentLevel();
@@ -1767,7 +1866,7 @@
     if (action === "tale-next") { finishTale(); return; }
     if (action === "land") { openLand(el.getAttribute("data-chapter")); return; }
     if (action === "locked") {
-      state.note = "Finish the land before this one. Bunny cannot skip ahead.";
+      state.note = "Finish the page before this one.";
       state.screen = "map";
       render();
       return;
@@ -1999,6 +2098,7 @@
       observer.observe(pad);
     }
     if (!applyPreview()) {
+      stampDay();
       if (!restorePlace()) render();
       remember();
     }
@@ -2022,6 +2122,21 @@
         if (level.kind === "loop" && !level.target) problems.push(level.id + " target");
         if ((level.kind === "spell" || level.kind === "order") && (!level.recipe || !level.tray)) problems.push(level.id + " recipe");
         if (level.kind === "boss" && (!level.locks || level.locks.length < 3)) problems.push(level.id + " locks");
+        if (level.kind === "pick") {
+          if (!level.prompts || level.prompts.length < 4) problems.push(level.id + " prompts");
+          var counts = {};
+          (level.prompts || []).forEach(function (prompt) {
+            if (!prompt.in || prompt.in.length !== level.inputs.length) problems.push(level.id + " prompt width");
+            if (level.choices.indexOf(prompt.answer) < 0) problems.push(level.id + " prompt answer");
+            if (!GATES[prompt.answer] || GATES[prompt.answer].run(prompt.in) !== prompt.out) problems.push(level.id + " prompt match");
+            var winners = level.choices.filter(function (id) { return GATES[id].run(prompt.in) === prompt.out; });
+            if (winners.length !== 1) problems.push(level.id + " ambiguous");
+            counts[prompt.answer] = (counts[prompt.answer] || 0) + 1;
+          });
+          level.choices.forEach(function (id) {
+            if ((counts[id] || 0) < 2) problems.push(level.id + " needs two " + id);
+          });
+        }
         return;
       }
       level.rows.forEach(function (row) {
